@@ -69,7 +69,7 @@ static class Program
 
         string path = args[0];
 
-        if (!SkipSafe)
+        if (!SkipSafe && !NoMoving)
         {
             if (!GetUserConfirmation(path))
             {
@@ -217,9 +217,6 @@ static class Program
         string destinationPath = Path.Combine(sourcePath, destination);
         if(!Directory.Exists(destinationPath))
             Directory.CreateDirectory(destinationPath);
-        
-        Console.WriteLine(destinationPath);
-        Console.WriteLine(filePath);
 
         string fileName = Path.GetFileName(filePath);
 
