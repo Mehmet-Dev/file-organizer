@@ -1,4 +1,5 @@
-﻿using FileOrganizer.Util;
+﻿using System.Diagnostics;
+using FileOrganizer.Util;
 
 namespace FileOrganizer;
 
@@ -72,7 +73,7 @@ static class Program
         {
             if (!GetUserConfirmation(path))
             {
-                NoMoving = false;
+                NoMoving = true;
             }
         }
 
@@ -88,7 +89,11 @@ static class Program
         var countMap = GetGeneralCountMap();
         IEnumerable<string> files = Directory.EnumerateFiles(path);
         int unknownCount = 0; // for when the extension doesn't match any
+        
+        Stopwatch watch = new();
 
+        if(TrackTime)
+            watch = Stopwatch.StartNew();
 
         foreach (var name in files)
         {
@@ -97,7 +102,9 @@ static class Program
 
             string extension = Path.GetExtension(name);
 
-            if (extensionMap.TryGetValue(extension, out string? result))
+            string result;
+
+            if (extensionMap.TryGetValue(extension, out result!))
             {
                 if (Verbose)
                 {
@@ -113,16 +120,26 @@ static class Program
                 else if (!Silent)
                     ConsoleWriter.Success($"{name} goes into {result}.");
                 countMap[result]++;
+                
+                if(!NoMoving)
+                    MoveFile(path, name, result);
+
                 continue;
             }
 
             ConsoleWriter.Warning($"{name} is unknown.");
             unknownCount++;
+
+            if(OrganizeUnknown)
+                MoveFile(path, name, "Unknown");
         }
+
+        if(TrackTime)
+            watch.Stop();
 
         if(Silent && !Verbose)
             Console.Clear();
-        ConsoleWriter.Success("--* Final result *--");
+        ConsoleWriter.Success($"--* Final result in {watch.ElapsedMilliseconds}ms *--");
         foreach (KeyValuePair<string, int> pair in countMap)
         {
             ConsoleWriter.Info($"{pair.Key}: {pair.Value}");
@@ -195,8 +212,18 @@ static class Program
         Console.Write($"\rOrganizing files{dots}    ");
     }
 
-    private static void MoveFile(string sourcePath, string fileName, string destination)
+    private static void MoveFile(string sourcePath, string filePath, string destination)
     {
+        string destinationPath = Path.Combine(sourcePath, destination);
+        if(!Directory.Exists(destinationPath))
+            Directory.CreateDirectory(destinationPath);
         
+        Console.WriteLine(destinationPath);
+        Console.WriteLine(filePath);
+
+        string fileName = Path.GetFileName(filePath);
+
+
+        File.Move(filePath, Path.Combine(destinationPath, fileName));
     }
 }
