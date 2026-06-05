@@ -2,8 +2,54 @@
 
 namespace FileOrganizer;
 
-class Program
+static class Program
 {
+    /// <summary>
+    /// Indicates whether files should actually be moved or not.
+    /// Can be used to see results and not actually moved.
+    /// Affecting flag: --dry-run
+    /// Also affected by choosing not to organize it in the confirmation.
+    /// </summary>
+    static bool NoMoving = false;
+
+    /// <summary>
+    /// Indicates whether it should only print out the final results.
+    /// Affecting flag: --loud
+    /// Will be ignored when Verbose is set to true.
+    /// </summary>
+    static bool Silent = true;
+
+    /// <summary>
+    /// Indicates whether the unknown files should be organized too.
+    /// Affecting flag: --organize-unknown
+    /// Will be ignored when NoMoving is set to true.
+    /// </summary>
+    static bool OrganizeUnknown = false;
+
+    /// <summary>
+    /// Indicates whether even more details should be exposed.
+    /// Realistically speaking this would affect the speed of the process too. I think.
+    /// Affecting flag: --verbose
+    /// </summary>
+    static bool Verbose = false;
+
+    /// <summary>
+    /// Indicates whether to skip the confirmation to organize the folder.
+    /// Affecting flag: --skip-safe
+    /// </summary>
+    static bool SkipSafe = false;
+
+    /// <summary>
+    /// Indicates whether to measure the duration of the process.
+    /// Affecting flag: --skip-bench
+    /// </summary>
+    static bool TrackTime = true;
+
+    /// <summary>
+    /// Used for silent organizing.
+    /// </summary>
+    private static int _animationFrame = 0;
+
     static void Main(string[] args)
     {
         Console.Clear();
@@ -13,10 +59,25 @@ class Program
             return;
         }
 
+        NoMoving = args.Contains("--dry-run");
+        Silent = !args.Contains("--loud");
+        OrganizeUnknown = args.Contains("--organize-unknown");
+        Verbose = args.Contains("--verbose");
+        SkipSafe = args.Contains("--skip-safe");
+        TrackTime = !args.Contains("--skip-bench");
+
         string path = args[0];
 
+        if (!SkipSafe)
+        {
+            if (!GetUserConfirmation(path))
+            {
+                NoMoving = false;
+            }
+        }
+
         // general error checking
-        if(File.Exists(path))
+        if (File.Exists(path))
         {
             ConsoleWriter.Error("Provided path is a file, quitting.");
             return;
@@ -31,11 +92,26 @@ class Program
 
         foreach (var name in files)
         {
+            if (Silent && !Verbose)
+                ShowProgressAnimation();
+
             string extension = Path.GetExtension(name);
 
             if (extensionMap.TryGetValue(extension, out string? result))
             {
-                ConsoleWriter.Success($"{name} goes into {result}.");
+                if (Verbose)
+                {
+                    var info = new FileInfo(name);
+                    double sizeInKb = info.Length / 1024.0;
+
+                    ConsoleWriter.Success($"[{result.ToUpper()}] {info.Name}");
+                    ConsoleWriter.Dark($"  └─ Size: {sizeInKb:F2} KB");
+                    ConsoleWriter.Dark($"  └─ Created: {info.CreationTime:yyyy-MM-dd HH:mm:ss}");
+                    ConsoleWriter.Dark($"  └─ Modified: {info.LastWriteTime:yyyy-MM-dd HH:mm:ss}");
+                    ConsoleWriter.Dark($"  └─ Locked: {info.IsReadOnly}");
+                }
+                else if (!Silent)
+                    ConsoleWriter.Success($"{name} goes into {result}.");
                 countMap[result]++;
                 continue;
             }
@@ -44,13 +120,16 @@ class Program
             unknownCount++;
         }
 
-
+        if(Silent && !Verbose)
+            Console.Clear();
         ConsoleWriter.Success("--* Final result *--");
-        foreach(KeyValuePair<string, int> pair in countMap)
+        foreach (KeyValuePair<string, int> pair in countMap)
         {
             ConsoleWriter.Info($"{pair.Key}: {pair.Value}");
         }
         ConsoleWriter.Warning($"Unknown: {unknownCount}");
+
+
     }
 
     private static Dictionary<string, string> GetExtensionMap() => new(StringComparer.OrdinalIgnoreCase)
@@ -89,4 +168,35 @@ class Program
         {"Media", 0},
         {"Archives", 0}
     };
+
+    private static bool GetUserConfirmation(string targetPath)
+    {
+        ConsoleWriter.Warning($"Are you sure you want to organize: {targetPath}? (y/n)");
+        Console.Write("> ");
+
+        string? input = Console.ReadLine()?.Trim().ToLower();
+
+        // If they explicitly typed 'y' or 'yes', we are good to go
+        if (input == "y" || input == "yes")
+        {
+            return true;
+        }
+
+        // Default to safety for any other input
+        return false;
+    }
+
+    private static void ShowProgressAnimation()
+    {
+        _animationFrame = (_animationFrame + 1) % 4;
+        string dots = new string('.', _animationFrame);
+
+        // The \r resets the cursor, the spaces at the end clean up old trailing dots
+        Console.Write($"\rOrganizing files{dots}    ");
+    }
+
+    private static void MoveFile(string sourcePath, string fileName, string destination)
+    {
+        
+    }
 }
