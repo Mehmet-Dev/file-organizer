@@ -218,9 +218,16 @@ static class Program
         if(!Directory.Exists(destinationPath))
             Directory.CreateDirectory(destinationPath);
 
-        string fileName = Path.GetFileName(filePath);
+        string tempFileName = Path.GetFileName(filePath);
+        string destinationFile = Path.Combine(destinationPath, tempFileName);
+        
+        // if the file exists, try renaming it
+        for(int i = 0; File.Exists(destinationFile); i++)
+        {
+            string fileName = Path.GetFileNameWithoutExtension(filePath) + $" ({i})" + Path.GetExtension(filePath);
+            destinationFile = Path.Combine(destinationPath, fileName);
+        }
 
-
-        File.Move(filePath, Path.Combine(destinationPath, fileName));
+        File.Move(filePath, destinationFile);
     }
 }
