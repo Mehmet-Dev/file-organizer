@@ -86,13 +86,13 @@ static class Program
 
         // setting up program
         var extensionMap = GetExtensionMap();
-        var countMap = GetGeneralCountMap();
+        Dictionary<string, int> countMap = [];
         IEnumerable<string> files = Directory.EnumerateFiles(path);
         int unknownCount = 0; // for when the extension doesn't match any
-        
+
         Stopwatch watch = new();
 
-        if(TrackTime)
+        if (TrackTime)
             watch = Stopwatch.StartNew();
 
         foreach (var name in files)
@@ -119,9 +119,14 @@ static class Program
                 }
                 else if (!Silent)
                     ConsoleWriter.Success($"{name} goes into {result}.");
+                if (!countMap.ContainsKey(result))
+                {
+                    countMap[result] = 0;
+                }
+
                 countMap[result]++;
-                
-                if(!NoMoving)
+
+                if (!NoMoving)
                     MoveFile(path, name, result);
 
                 continue;
@@ -130,14 +135,14 @@ static class Program
             ConsoleWriter.Warning($"{name} is unknown.");
             unknownCount++;
 
-            if(OrganizeUnknown)
+            if (OrganizeUnknown)
                 MoveFile(path, name, "Unknown");
         }
 
-        if(TrackTime)
+        if (TrackTime)
             watch.Stop();
 
-        if(Silent && !Verbose)
+        if (Silent && !Verbose)
             Console.Clear();
         ConsoleWriter.Success($"--* Final result in {watch.ElapsedMilliseconds}ms *--");
         foreach (KeyValuePair<string, int> pair in countMap)
@@ -154,9 +159,14 @@ static class Program
         // Documents
         { ".pdf", "Documents" },
         { ".docx", "Documents" },
+        { ".doc", "Documents" },
         { ".txt", "Documents" },
         { ".xlsx", "Documents" },
+        { ".xls", "Documents" },
         { ".csv", "Documents" },
+        { ".pptx", "Documents" },
+        { ".md", "Documents" },
+        { ".epub", "Documents" },
     
         // Images
         { ".png", "Images" },
@@ -164,26 +174,52 @@ static class Program
         { ".jpeg", "Images" },
         { ".gif", "Images" },
         { ".svg", "Images" },
+        { ".png", "Images" },
+        { ".jpg", "Images" },
+        { ".jpeg", "Images" },
+        { ".gif", "Images" },
+        { ".svg", "Images" },
+        { ".webp", "Images" },
+        { ".ico", "Images" },
+        { ".heic", "Images" },
     
-        // Media (Audio/Video)
-        { ".mp3", "Media" },
-        { ".mp4", "Media" },
-        { ".mkv", "Media" },
-        { ".wav", "Media" },
+        // Audio
+        { ".mp3", "Audio" },
+        { ".wav", "Audio" },
+        { ".flac", "Audio" },
+        { ".m4a", "Audio" },
+        { ".ogg", "Audio" },
+
+        // Video
+        { ".mp4", "Video" },
+        { ".mkv", "Video" },
+        { ".mov", "Video" },
+        { ".avi", "Video" },
+        { ".webm", "Video" },
     
-        // Archives
+        // Archives & Disk Images
         { ".zip", "Archives" },
         { ".tar.gz", "Archives" },
+        { ".tar", "Archives" },
+        { ".gz", "Archives" },
         { ".rar", "Archives" },
-        { ".7z", "Archives" }
-    };
+        { ".7z", "Archives" },
+        { ".iso", "Archives" },
 
-    private static Dictionary<string, int> GetGeneralCountMap() => new()
-    {
-        {"Documents", 0},
-        {"Images", 0},
-        {"Media", 0},
-        {"Archives", 0}
+        // Code & Scripts
+        { ".cs", "Code" },
+        { ".py", "Code" },
+        { ".js", "Code" },
+        { ".html", "Code" },
+        { ".json", "Code" },
+        { ".sh", "Code" },
+
+        // Installers & Executables
+        { ".exe", "Installers" },
+        { ".msi", "Installers" },
+        { ".deb", "Installers" },
+        { ".rpm", "Installers" },
+        { ".appimage", "Installers" },
     };
 
     private static bool GetUserConfirmation(string targetPath)
@@ -215,14 +251,14 @@ static class Program
     private static void MoveFile(string sourcePath, string filePath, string destination)
     {
         string destinationPath = Path.Combine(sourcePath, destination);
-        if(!Directory.Exists(destinationPath))
+        if (!Directory.Exists(destinationPath))
             Directory.CreateDirectory(destinationPath);
 
         string tempFileName = Path.GetFileName(filePath);
         string destinationFile = Path.Combine(destinationPath, tempFileName);
-        
+
         // if the file exists, try renaming it
-        for(int i = 0; File.Exists(destinationFile); i++)
+        for (int i = 0; File.Exists(destinationFile); i++)
         {
             string fileName = Path.GetFileNameWithoutExtension(filePath) + $" ({i})" + Path.GetExtension(filePath);
             destinationFile = Path.Combine(destinationPath, fileName);
