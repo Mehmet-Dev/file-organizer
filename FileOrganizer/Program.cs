@@ -1,4 +1,5 @@
 ﻿using System.Diagnostics;
+using System.Text.Json;
 using FileOrganizer.Util;
 
 namespace FileOrganizer;
@@ -51,8 +52,18 @@ static class Program
     /// </summary>
     private static int _animationFrame = 0;
 
+    /// <summary>
+    /// Variable used for globally storing file moving history.
+    /// Used in <see cref="MoveFile"/> to make a history, and used in <see cref="MoveHistory"/> to move things back to their original places.
+    /// </summary>
+    private static List<string[]> _history = new();
+
     static void Main(string[] args)
     {
+        string historyFolder = Path.Combine(AppContext.BaseDirectory, "History");
+        if(!Directory.Exists(historyFolder))
+            Directory.CreateDirectory(historyFolder);
+
         Console.Clear();
         if (args.Length == 0)
         {
@@ -69,6 +80,13 @@ static class Program
 
         string path = args[0];
 
+        // general error checking
+        if (File.Exists(path))
+        {
+            ConsoleWriter.Error("Provided path is a file, quitting.");
+            return;
+        }
+
         if (!SkipSafe && !NoMoving)
         {
             if (!GetUserConfirmation(path))
@@ -77,18 +95,13 @@ static class Program
             }
         }
 
-        // general error checking
-        if (File.Exists(path))
-        {
-            ConsoleWriter.Error("Provided path is a file, quitting.");
-            return;
-        }
-
         // setting up program
         var extensionMap = GetExtensionMap();
         Dictionary<string, int> countMap = [];
         IEnumerable<string> files = Directory.EnumerateFiles(path);
         int unknownCount = 0; // for when the extension doesn't match any
+
+        _history.Add([$"File history of folder {Path.GetDirectoryName(path)} at {DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss")}"]);
 
         Stopwatch watch = new();
 
@@ -127,7 +140,10 @@ static class Program
                 countMap[result]++;
 
                 if (!NoMoving)
+                {
                     MoveFile(path, name, result);
+                }
+                    
 
                 continue;
             }
@@ -151,7 +167,12 @@ static class Program
         }
         ConsoleWriter.Warning($"Unknown: {unknownCount}");
 
+        var options = new JsonSerializerOptions { WriteIndented = true };
+        string json = JsonSerializer.Serialize(_history, options);
 
+        string historyFile = $"history_{DateTime.Now:yyyyMMdd_HHmmss}.json";
+        string historyFilePath = Path.Combine(historyFolder, historyFile);
+        File.WriteAllText(historyFilePath, json);
     }
 
     private static Dictionary<string, string> GetExtensionMap() => new(StringComparer.OrdinalIgnoreCase)
@@ -260,5 +281,6 @@ static class Program
         }
 
         File.Move(filePath, destinationFile);
+        _history.Add([filePath, destinationFile]);
     }
 }
