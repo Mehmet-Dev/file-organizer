@@ -66,6 +66,12 @@ static class Program
 
     static void Main(string[] args)
     {
+        if (args.Contains("--help"))
+        {
+            ShowHelp();
+            return;
+        }
+
         string historyFolder = Path.Combine(AppContext.BaseDirectory, "History");
         if (!Directory.Exists(historyFolder))
             Directory.CreateDirectory(historyFolder);
@@ -428,5 +434,84 @@ static class Program
 
         File.Move(filePath, destinationFile);
         _history.Add([filePath, destinationFile]);
+    }
+
+    private static void ShowHelp()
+    {
+        ConsoleWriter.Info("FileOrganizer");
+        ConsoleWriter.Dark("A cross-platform CLI utility for organizing files by extension.");
+        Console.WriteLine();
+
+        ConsoleWriter.Warning("USAGE:");
+        Console.WriteLine("  FileOrganizer <path> [flags]");
+        Console.WriteLine();
+
+        ConsoleWriter.Warning("EXAMPLES:");
+        Console.WriteLine("  FileOrganizer ~/Downloads");
+        Console.WriteLine("  FileOrganizer ~/Downloads --dry-run");
+        Console.WriteLine("  FileOrganizer ~/Downloads --verbose --loud");
+        Console.WriteLine("  FileOrganizer --undo-move");
+        Console.WriteLine();
+
+        ConsoleWriter.Warning("FLAGS:");
+
+        ConsoleWriter.Info("  --help");
+        Console.WriteLine("      Display this help message.");
+
+        ConsoleWriter.Info("  --dry-run");
+        Console.WriteLine("      Preview the organization without moving any files.");
+
+        ConsoleWriter.Info("  --loud");
+        Console.WriteLine("      Display information about each file while organizing.");
+
+        ConsoleWriter.Info("  --verbose");
+        Console.WriteLine("      Display detailed information about each file, including");
+        Console.WriteLine("      size, creation date, modification date and read-only status.");
+        Console.WriteLine("      Overrides --loud.");
+
+        ConsoleWriter.Info("  --organize-unknown");
+        Console.WriteLine("      Move files with unrecognized extensions into an");
+        Console.WriteLine("      \"Unknown\" directory.");
+
+        ConsoleWriter.Info("  --skip-safe");
+        Console.WriteLine("      Skip the confirmation prompt before organizing.");
+
+        ConsoleWriter.Info("  --skip-bench");
+        Console.WriteLine("      Disable execution time measurement.");
+
+        ConsoleWriter.Info("  --undo-move");
+        Console.WriteLine("      Select a previous organization history and undo its changes.");
+
+        Console.WriteLine();
+        ConsoleWriter.Warning("ORGANIZATION:");
+
+        ConsoleWriter.Success("  Documents");
+        ConsoleWriter.Dark("      .pdf .docx .doc .txt .xlsx .xls .csv .pptx .md .epub");
+
+        ConsoleWriter.Success("  Images");
+        ConsoleWriter.Dark("      .png .jpg .jpeg .gif .svg .webp .ico .heic");
+
+        ConsoleWriter.Success("  Audio");
+        ConsoleWriter.Dark("      .mp3 .wav .flac .m4a .ogg");
+
+        ConsoleWriter.Success("  Video");
+        ConsoleWriter.Dark("      .mp4 .mkv .mov .avi .webm");
+
+        ConsoleWriter.Success("  Archives");
+        ConsoleWriter.Dark("      .zip .tar.gz .tar .gz .rar .7z .iso");
+
+        ConsoleWriter.Success("  Code");
+        ConsoleWriter.Dark("      .cs .py .js .html .json .sh");
+
+        ConsoleWriter.Success("  Installers");
+        ConsoleWriter.Dark("      .exe .msi .deb .rpm .appimage");
+
+        Console.WriteLine();
+        ConsoleWriter.Warning("NOTES:");
+        Console.WriteLine("  Files with unrecognized extensions are left untouched unless");
+        Console.WriteLine("  --organize-unknown is specified.");
+        Console.WriteLine();
+        Console.WriteLine("  A history file is created whenever files are actually moved,");
+        Console.WriteLine("  allowing previous operations to be reverted with --undo-move.");
     }
 }
