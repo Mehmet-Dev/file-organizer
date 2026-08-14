@@ -48,20 +48,26 @@ static class Program
     static bool TrackTime = true;
 
     /// <summary>
+    /// Used in resetting an earlier done sorting.
+    /// Affecting flag: --undo-move
+    /// </summary>
+    static bool UndoMove = false;
+
+    /// <summary>
     /// Used for silent organizing.
     /// </summary>
     private static int _animationFrame = 0;
 
     /// <summary>
     /// Variable used for globally storing file moving history.
-    /// Used in <see cref="MoveFile"/> to make a history, and used in <see cref="MoveHistory"/> to move things back to their original places.
+    /// Used in <see cref="MoveFile"/> to make a history, and used in <see cref="InitiateUndo"/> to move things back to their original places.
     /// </summary>
     private static List<string[]> _history = new();
 
     static void Main(string[] args)
     {
         string historyFolder = Path.Combine(AppContext.BaseDirectory, "History");
-        if(!Directory.Exists(historyFolder))
+        if (!Directory.Exists(historyFolder))
             Directory.CreateDirectory(historyFolder);
 
         Console.Clear();
@@ -69,6 +75,13 @@ static class Program
         {
             ConsoleWriter.Info("Usage: {path} {flags}\nUse flag --help for a list of flags");
             return;
+        }
+
+        UndoMove = args.Contains("--undo-move");
+
+        if (UndoMove)
+        {
+            InitiateUndo(historyFolder);
         }
 
         NoMoving = args.Contains("--dry-run");
@@ -89,7 +102,7 @@ static class Program
 
         if (!SkipSafe && !NoMoving)
         {
-            if (!GetUserConfirmation(path))
+            if (!GetUserConfirmation($"Are you sure you want to organize: {path}?"))
             {
                 NoMoving = true;
             }
@@ -101,7 +114,9 @@ static class Program
         IEnumerable<string> files = Directory.EnumerateFiles(path);
         int unknownCount = 0; // for when the extension doesn't match any
 
-        _history.Add([$"File history of folder {Path.GetDirectoryName(path)} at {DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss")}"]);
+        // Only create the history folder in the case we actually move files
+        if (!NoMoving)
+            _history.Add([$"File history of folder {Path.GetDirectoryName(path)} at {DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss")}"]);
 
         Stopwatch watch = new();
 
@@ -143,7 +158,7 @@ static class Program
                 {
                     MoveFile(path, name, result);
                 }
-                    
+
 
                 continue;
             }
@@ -173,6 +188,137 @@ static class Program
         string historyFile = $"history_{DateTime.Now:yyyyMMdd_HHmmss}.json";
         string historyFilePath = Path.Combine(historyFolder, historyFile);
         File.WriteAllText(historyFilePath, json);
+    }
+
+    /// <summary>
+    /// Used. TRUE
+    /// </summary>
+    private static void InitiateUndo(string historyFolder)
+    {
+        string[] histories = Directory.GetFiles(historyFolder);
+        List<string> historyHeaders = [];
+
+        if (histories.Length <= 0)
+        {
+            ConsoleWriter.Error("ERROR: There are no any past history files present. Exiting.");
+            Environment.Exit(-1);
+        }
+
+        // getting headers of the json files
+        foreach (string history in histories)
+        {
+            using var stream = File.OpenRead(history);
+            using var doc = JsonDocument.Parse(stream);
+
+            JsonElement root = doc.RootElement;
+            JsonElement first = root.EnumerateArray().FirstOrDefault();
+
+            if (first.ValueKind == JsonValueKind.Array)
+            {
+                string headerText = first[0].GetString();
+                historyHeaders.Add(headerText);
+            }
+        }
+
+        // displaying the possible choices in a nice manner
+        for (int i = 0; i < historyHeaders.Count; i++)
+        {
+            ConsoleWriter.Info($"{i + 1}. {historyHeaders[i]}");
+        }
+
+        int index = 0;
+
+        while (true)
+        {
+            ConsoleWriter.Warning($"\nMake a choice (1-{historyHeaders.Count + 1}), 0 to exit.");
+            string? input = Console.ReadLine();
+
+            // not an int
+            if (!int.TryParse(input, out int choice))
+            {
+                ConsoleWriter.Error("ERROR: Invalid input, please try again.");
+                continue;
+            }
+
+            // if user exits
+            if (choice == 0)
+            {
+                ConsoleWriter.Info("Exiting...");
+                Environment.Exit(0);
+            }
+
+            // if index is out of range
+            if (choice > historyHeaders.Count || choice < 1)
+            {
+                ConsoleWriter.Error("ERROR: Index is out of range, try again.");
+                continue;
+            }
+
+            //finally assume everything is dealt with
+            index = --choice;
+            break;
+        }
+
+        Console.Clear();
+        bool confirm = GetUserConfirmation($"Are you sure you want to undo the following organization: \"{historyHeaders[index]}\"?");
+
+        // start the process of undoing
+        if (confirm)
+        {
+            // i suppose we try implementing it with our previous approach of reading it through the IO stream
+            using var stream = File.OpenRead(histories[index]);
+            using var doc = JsonDocument.Parse(stream);
+
+            JsonElement root = doc.RootElement;
+
+            foreach (JsonElement elm in root.EnumerateArray().Skip(1))
+            {
+                string before = elm[0].GetString();
+                string after = elm[1].GetString();
+
+                // case 1: check whether the file is still in the "after" part
+                if (!File.Exists(after))
+                {
+                    ConsoleWriter.Error($"ERROR: File {after} does not exist, skipping.");
+                    continue;
+                }
+
+                // case 2: check whether the file exists in the before part. if yes, rename the file
+                if (File.Exists(before))
+                {
+                    string directory = Path.GetDirectoryName(before)!;
+                    string name = Path.GetFileNameWithoutExtension(before);
+                    string extension = Path.GetExtension(before);
+
+                    int i = 1;
+                    string newPath;
+
+                    do
+                    {
+                        newPath = Path.Combine(directory, $"{name} ({i}){extension}");
+                        i++;
+                    }
+                    while (File.Exists(newPath));
+
+                    before = newPath;
+                }
+
+                try { File.Move(after, before); }
+                catch (Exception e)
+                {
+                    ConsoleWriter.Error($"ERROR: {e.Message}");
+                }
+            }
+
+            // assuming it ran well i guess...
+            ConsoleWriter.Success("Successfully reverted changes. If there are any errors, you'll see it there.");
+            File.Delete(histories[index]);
+        }
+
+        if (!confirm)
+            ConsoleWriter.Info("Exiting...");
+
+        Environment.Exit(0);
     }
 
     private static Dictionary<string, string> GetExtensionMap() => new(StringComparer.OrdinalIgnoreCase)
@@ -230,7 +376,7 @@ static class Program
         { ".json", "Code" },
         { ".sh", "Code" },
 
-        // Installers & Executables
+        // Installers & ExecutablesFlySharp
         { ".exe", "Installers" },
         { ".msi", "Installers" },
         { ".deb", "Installers" },
@@ -238,9 +384,9 @@ static class Program
         { ".appimage", "Installers" },
     };
 
-    private static bool GetUserConfirmation(string targetPath)
+    private static bool GetUserConfirmation(string prompt)
     {
-        ConsoleWriter.Warning($"Are you sure you want to organize: {targetPath}? (y/n)");
+        ConsoleWriter.Warning($"{prompt} (y/n)");
         Console.Write("> ");
 
         string? input = Console.ReadLine()?.Trim().ToLower();
