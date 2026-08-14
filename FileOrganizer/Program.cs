@@ -6,6 +6,7 @@ namespace FileOrganizer;
 
 static class Program
 {
+    static string Version = "v0.0.1-alpha.1-dev.experimental.unstable.preview";
     /// <summary>
     /// Indicates whether files should actually be moved or not.
     /// Can be used to see results and not actually moved.
@@ -69,6 +70,12 @@ static class Program
         if (args.Contains("--help"))
         {
             ShowHelp();
+            return;
+        }
+
+        if(args.Contains("--version"))
+        {
+            ConsoleWriter.Info($"Version: {Version}\nI am a sentient app.");
             return;
         }
 
@@ -221,7 +228,7 @@ static class Program
 
             if (first.ValueKind == JsonValueKind.Array)
             {
-                string headerText = first[0].GetString();
+                string headerText = first[0].GetString()!;
                 historyHeaders.Add(headerText);
             }
         }
@@ -279,8 +286,8 @@ static class Program
 
             foreach (JsonElement elm in root.EnumerateArray().Skip(1))
             {
-                string before = elm[0].GetString();
-                string after = elm[1].GetString();
+                string before = elm[0].GetString()!;
+                string after = elm[1].GetString()!;
 
                 // case 1: check whether the file is still in the "after" part
                 if (!File.Exists(after))
@@ -454,6 +461,9 @@ static class Program
         Console.WriteLine();
 
         ConsoleWriter.Warning("FLAGS:");
+
+        ConsoleWriter.Info("  --version");
+        Console.WriteLine("     Displays the version number.");
 
         ConsoleWriter.Info("  --help");
         Console.WriteLine("      Display this help message.");
